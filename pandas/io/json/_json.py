@@ -3,6 +3,7 @@ import functools
 from io import StringIO
 from itertools import islice
 import os
+import warnings
 from typing import Any, Callable, Optional, Type
 
 import numpy as np
@@ -94,6 +95,14 @@ def to_json(
         finally:
             fh.close()
     elif path_or_buf is None:
+        if compression is not None:
+            warnings.warn(
+                "Compression is specified,"
+                " but no file path specified."
+                " Returning JSON object without compression.",
+                Warning,
+                stacklevel=2,
+            )
         return s
     else:
         path_or_buf.write(s)
