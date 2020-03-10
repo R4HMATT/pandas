@@ -344,15 +344,28 @@ with cf.config_prefix("display"):
     )
     cf.register_option("max_categories", 8, pc_max_categories_doc, validator=is_int)
 
-    def _deprecate_negative_int_max_colwidth(key):
+    def _max_colwidth_warnings(key):
         value = cf.get_option(key)
+        _deprecate_negative_int_max_colwidth(value)
+        _max_colwidth_min_size(value)
+
+    def _deprecate_negative_int_max_colwidth(value):
         if value is not None and value < 0:
             warnings.warn(
                 "Passing a negative integer is deprecated in version 1.0 and "
                 "will not be supported in future version. Instead, use None "
                 "to not limit the column width.",
                 FutureWarning,
-                stacklevel=4,
+                stacklevel=5,
+            )
+
+    def _max_colwidth_min_size(value):
+        if value is not None and value < 4:
+            warnings.warn(
+                "Passing a integer that is less than 4 will have no affect due to the string size of "
+                "the ellipse size being 3.",
+                Warning,
+                stacklevel=5,
             )
 
     cf.register_option(
@@ -362,7 +375,7 @@ with cf.config_prefix("display"):
         50,
         max_colwidth_doc,
         validator=is_instance_factory([type(None), int]),
-        cb=_deprecate_negative_int_max_colwidth,
+        cb=_max_colwidth_warnings,
     )
     if is_terminal():
         max_cols = 0  # automatically determine optimal number of columns
