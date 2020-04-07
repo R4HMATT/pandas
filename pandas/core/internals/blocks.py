@@ -8,6 +8,8 @@ import warnings
 import numpy as np
 
 from pandas._libs import NaT, Timestamp, algos as libalgos, lib, tslib, writers
+from pandas._libs.missing import NAType, NA
+from pandas.core.arrays.integer import _IntegerDtype
 import pandas._libs.internals as libinternals
 from pandas._libs.tslibs import Timedelta, conversion
 from pandas._libs.tslibs.timezones import tz_compare
@@ -52,6 +54,7 @@ from pandas.core.dtypes.common import (
     pandas_dtype,
 )
 from pandas.core.dtypes.concat import concat_categorical, concat_datetime
+from pandas.core.arrays.integer import _IntegerDtype, IntegerArray
 from pandas.core.dtypes.dtypes import CategoricalDtype, ExtensionDtype
 from pandas.core.dtypes.generic import (
     ABCDataFrame,
@@ -601,8 +604,22 @@ class Block(PandasObject):
         # force the copy here
         if self.is_extension:
             # TODO: Should we try/except this astype?
-            values = self.values.astype(dtype)
+            if isinstance(dtype, _IntegerDtype) or dtype == np.dtype('int64').type:
+                mask = np.array([True if isinstance(x, type(NA)) else False for x in self.values])
+                values = np.array([x if not isinstance(x, type(NA)) else 0 for x in self.values])
+                values = values.astype(dtype.type)
+
+                values = IntegerArray(values=values, mask=mask, copy=copy)
+            else:
+                values = self.values.astype(dtype)
+ 
+        elif self.dtype == np.dtype('O') and not issubclass(dtype.type, str):
+            mask = np.array([True if isinstance(x, type(NA)) else False for x in self.values])
+            values = np.array([x if not isinstance(x, type(NA)) else 0 for x in self.values])
+            values = values.astype(dtype.type)
+            values = IntegerArray(values=values, mask=mask, copy=copy)
         else:
+
             if issubclass(dtype.type, str):
 
                 # use native type formatting for datetime/tz/timedelta
@@ -634,6 +651,7 @@ class Block(PandasObject):
             values = values.reshape(self.shape)
 
         newb = make_block(values, placement=self.mgr_locs, ndim=self.ndim)
+
 
         if newb.is_numeric and self.is_numeric:
             if newb.shape != self.shape:
