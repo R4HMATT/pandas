@@ -551,6 +551,27 @@ class Block(PandasObject):
 
         return self.split_and_operate(None, f, False)
 
+    def convert_to_masked_integer_array(self, dtype, copy: bool = False):
+        """
+        Return an IntegerArray with masked values.
+        For use by Block containing either StringArray or array with object dtype.
+
+        Parameters
+        ----------
+        dtype : str, (either 'int64' or 'Int64')
+        copy : bool, default False
+            copy if indicated
+
+        Returns
+        -------
+        IntegerArray
+        """
+        mask = np.array([True if isinstance(x, type(NA)) else False for x in self.values])
+        values = np.array([x if not isinstance(x, type(NA)) else 0 for x in self.values])
+        values = values.astype(dtype.type)
+        return IntegerArray(values=values, mask=mask, copy=copy)
+
+
     def astype(self, dtype, copy: bool = False, errors: str = "raise"):
         """
         Coerce to the new dtype.
@@ -605,19 +626,12 @@ class Block(PandasObject):
         if self.is_extension:
             # TODO: Should we try/except this astype?
             if isinstance(dtype, _IntegerDtype) or dtype == np.dtype('int64').type:
-                mask = np.array([True if isinstance(x, type(NA)) else False for x in self.values])
-                values = np.array([x if not isinstance(x, type(NA)) else 0 for x in self.values])
-                values = values.astype(dtype.type)
-
-                values = IntegerArray(values=values, mask=mask, copy=copy)
+                values = self.convert_to_masked_integer_array(dtype, copy)
             else:
                 values = self.values.astype(dtype)
  
-        elif self.dtype == np.dtype('O') and not issubclass(dtype.type, str):
-            mask = np.array([True if isinstance(x, type(NA)) else False for x in self.values])
-            values = np.array([x if not isinstance(x, type(NA)) else 0 for x in self.values])
-            values = values.astype(dtype.type)
-            values = IntegerArray(values=values, mask=mask, copy=copy)
+        elif self.dtype == np.dtype('O') and (isinstance(dtype, _IntegerDtype) or dtype == np.dtype('int64').type):
+            values = self.convert_to_masked_integer_array(dtype, copy)
         else:
 
             if issubclass(dtype.type, str):
